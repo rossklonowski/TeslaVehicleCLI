@@ -1,0 +1,20 @@
+{
+  "name": "TeslaVehicleCLI",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^8.2.0",
+    "http": "0.0.0",
+    "https": "^1.0.0",
+    "initial-state": "^0.2.0",
+    "prompt": "^1.0.0",
+    "request": "^2.88.0"
+  }
+}
