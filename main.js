@@ -12,8 +12,7 @@
 ///         Tesla Unofficial
 ///
 ///     Written By Ross Klonowski
-///     Last Modified: December 27th, 2019
-///     V.0.3
+///     
 /// 
 ///********************************************************************************************
 
@@ -30,8 +29,9 @@ const readline = require('readline').createInterface({
 var program = {
     debug: true, // Will show errors and responses from APIs
     enable_lights: false, 
-    show_uploaded: true,
-    polling_delay: 240, // delay between updates in seconds
+    show_uploaded: false,
+    show_api_responses: false,
+    polling_delay: process.env['POLLING_DELAY'], // delay between updates in seconds
 }
 
 // Dark Sky
@@ -196,7 +196,7 @@ class Light {
                 throw new Error(error);
             }
 
-            if (program.debug) { 
+            if (program.show_api_responses) { 
                 console.log(JSON.parse(body)); 
             }
         })
@@ -293,8 +293,6 @@ function pushLocation(latTile, longTile, Latitude, Longitude, time) {
 
     pushValue(latTile, Latitude, time);
     pushValue(longTile, Longitude, time);
-
-
 }
 
 function time_since_epoch() {
@@ -317,13 +315,9 @@ function authenticate() {
 
     function process_authentication(my_obj){ 
 
-        console.log(my_obj);
-
-        console.log('Response type: ' + typeof my_obj);
-
         my_obj = JSON.parse(my_obj); 
         
-        if (program.debug) {
+        if (1) {
             console.log("access_token: " + my_obj.access_token);
             console.log("token_type: " + my_obj.token_type);
             console.log("expires_in: " + my_obj.expires_in);
@@ -357,10 +351,12 @@ function authenticate() {
 function get_vehicle_id() {
     
     function process_data_response(this_obj){
+        
         this_obj = JSON.parse(this_obj);
+        
         this_obj = this_obj.response;
-        if (program.debug) {
-            //console.log(this_obj)
+
+        if (program.show_api_responses) {
             console.log("id: " + this_obj[0].id_s) // We use id_s since vehicle_id is too large for JSON
         }
         return (this_obj[0].id_s)
@@ -375,7 +371,6 @@ function get_vehicle_id() {
                                 'User-Agent': '007',
                                  }
                       };
-        
         
         request(options, function (error, response, body, status) {
             if (error) {
@@ -394,8 +389,6 @@ function get_vehicle_id() {
 function get_state() {
     
     function process_state_response(this_obj){
-        
-        //console.log('Response type: ' + typeof this_obj);
 
         if (!this_obj.includes('<!DOCTYPE')) { // If response is '<!DOCTYPE html>', servers are having problems.
 
@@ -406,11 +399,10 @@ function get_state() {
                 if (this_obj.response != undefined) // If response is undefined, car is sleeping
                 {
                     
-                    if (program.debug) {
+                    if (program.show_api_responses) {
                         console.log('Tesla data response:');
                         console.log(this_obj);
                     }
-
                     // Get timestamp
                     let teslaTimestamp = this_obj.response.charge_state.timestamp;
 
@@ -579,7 +571,7 @@ function wake_up_vehicle() {
     function process_wake_up(my_obj){ 
         
         my_obj = JSON.parse(my_obj); 
-        if (program.debug) {
+        if (program.show_api_responses) {
             console.log(my_obj);
         }
     };
@@ -617,7 +609,7 @@ function update_weather() {
         
         this_obj = JSON.parse(this_obj);
     
-        if (program.debug) {
+        if (program.show_api_responses) {
             console.log('Dark Sky Response:');
             console.log(this_obj);
         }
@@ -707,10 +699,9 @@ function update_timestamp(seedForDate) {
     let month = date.getMonth();
     let day = date.getDay();
 
-    let timeString = hours + ':' + minutes + ' ' + am_or_pm + ', ' + (date.getMonth() + 1) + '/' + date.getDate() + '/' + date.getFullYear(); 
+    let timeString = hours + ':' + minutes + ' ' + am_or_pm + ', ' + (month + 1) + '/' + day + '/' + year; 
 
-    pushValue(signal.time_since_last_refresh, timeString); //bucket.push(key, value[, date])
-
+    pushValue(signal.time_since_last_refresh, timeString);
 }
 
 function update_stock() {
@@ -721,7 +712,7 @@ function update_stock() {
 
             this_obj = JSON.parse(this_obj);
 
-            if (program.debug) {
+            if (program.show_api_responses) {
                 console.log('IEX Cloud response:');
                 console.log(this_obj);
             }
@@ -732,7 +723,6 @@ function update_stock() {
 
             console.log('Response is empty!');
             pushValue(signal.last_sale_price, ':x:');
-
         }
     };
         
@@ -778,7 +768,7 @@ function get_option_codes() {
         if (this_obj.response != undefined)
         {
             
-            if (program.debug) {
+            if (program.show_api_responses) {
                 console.log('OP Codes response:');
                 console.log(this_obj);
             }
@@ -1223,16 +1213,19 @@ function get_option_codes() {
 
 function reverse_geocode(latpar, lonpar) {
 
+    latpar = 41.496211
+    lonpar = -81.6874176
+
     if ((latpar == undefined) && (lonpar == undefined)) { // If the location of car isnt specified, use default home coordinates
-        latpar = home.lat;
-        lonpar = home.lon;
+        // latpar = home.lat;
+        // lonpar = home.lon;
     }
 
     function process_mapquest_response(this_obj){
 
         this_obj = JSON.parse(this_obj);
 
-        if (program.debug) {
+        if (program.show_api_responses) {
             console.log('Mapquest Response:');
             console.log(this_obj);
         }
@@ -1288,18 +1281,37 @@ function reverse_geocode(latpar, lonpar) {
 
 function main() {
 
-readline.question(`Option 1: Authenticate
-Option 2: Get Vehicle id
-Option 3: Get Option Codes
-Option 4: Get Vehicle Data
-Option 5: Wake up Vehicle
-Option 6: Update Weather
-Option 7: Update All
-Option 8: Repeat Indefinitely
-Option 9: Update TSLA stock
-Option 10: Geocode Location
-`, (input) => {
+    console.log(''.padStart(60, ' '));
+    console.log(''.padStart(60, ' '));
+    console.log(''.padStart(60, ' '));
+    console.log(''.padStart(60, ' '));
+    console.log(''.padStart(60, ' '));
+    console.log(''.padStart(60, ' '));
+    console.log(''.padStart(60, ' '));
+    console.log(''.padStart(60, ' '));
+    console.log(''.padStart(60, ' '));
+    console.log(''.padStart(60, ' '));
+    console.log(''.padStart(60, ' '));
+    console.log(''.padStart(60, ' '));
 
+    console.log(''.padStart(60, '-'));
+    console.log('          Tesla Dashboard - Powered By Initial State');
+    console.log(''.padStart(60, '-'));
+    console.log('Menu'.padStart(28, ' '));
+    console.log(''.padStart(60, '-'));
+    
+    readline.question(`                Option 1: Authenticate
+                Option 2: Get Vehicle ID
+                Option 3: Get Option Codes
+                Option 4: Get Vehicle Data
+                Option 5: Wake up Vehicle
+                Option 6: Update Weather
+                Option 7: Update All
+                Option 8: Repeat Indefinitely
+                Option 9: Update TSLA stock
+                Option 10: Reverse geocode location
+------------------------------------------------------------
+`, (input) => {
         switch(input) {
             case '1':
                 authenticate();
@@ -1327,14 +1339,23 @@ Option 10: Geocode Location
             case '8':
                 var cycles = 0;
                 function refreshData() {
+
                     x = program.polling_delay; // Timeout in seconds
-                    
                     cycles = cycles + 1;
-                    console.log('Cycles', cycles);
+                    
+                    if (cycles == 1) {
+                        console.log('Starting program with a ' + x + ' second polling frquency.') 
+                        console.log(''.padStart(60, '-'));
+                    }
+                    else {
+                        console.log('Program is running with a ' + x + ' second polling frequency.')
+                        console.log('Vehicle has been polled ' + cycles + ' times this session.')
+                        console.log(''.padStart(60, '-')); 
+                    }
+                
                     pushValue(signal.update_count, cycles);
                     
                     get_state();
-
                     update_weather();
 
                     if ((cycles % 2) == 1) {
