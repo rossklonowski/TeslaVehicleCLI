@@ -16,6 +16,9 @@
 /// 
 ///********************************************************************************************
 
+var ini = require('ini');
+const prompt = require('prompt-sync')();
+const fs = require('fs');
 var https = require("https");
 var IS = require('initial-state');
 const request = require("request");
@@ -30,7 +33,7 @@ var program = {
     debug: true, // Will show errors and responses from APIs
     enable_lights: false, 
     show_uploaded: false,
-    show_api_responses: false,
+    show_api_responses: true,
     polling_delay: process.env['POLLING_DELAY'], // delay between updates in seconds
 }
 
@@ -40,26 +43,34 @@ var darkSky = {
     lat: process.env['HOME_LAT'],
     lon: process.env['HOME_LON'],
 }
+
 // Philips Hue
 var bridge = {
     IPaddress: process.env['PHILIPS_HUE_IP_ADDRESS'],
     username: process.env['PHILIPS_HUE_USERNAME'],
 }
+
 // Tesla
 var tesla = {
     current_access_token: process.env['TESLA_CURRENT_ACCESS_TOKEN'],
-    access_token: process.env['TESLA_ACCESS_TOKEN'], // Expires every 45 days
+    //access_token: process.env['TESLA_ACCESS_TOKEN'], // Expires every 45 days
+    access_token : '',
     vehicle_id: process.env['TESLA_VEHICLE_ID'],
 }
+config = ini.parse(fs.readFileSync('./config.ini', 'utf-8'));
+tesla.access_token = config.TESLA_ACCESS_TOKEN
+
 // Initial State
 var myBucket = {
     BUCKET_KEY: process.env['INITIAL_STATE_BUCKET_KEY'],
     ACCESS_KEY: process.env['INITIAL_STATE_ACCESS_KEY'], // Never Expires
 };
+
 // IEX Cloud
 var IEX_CLOUD = {
     token: process.env['IEX_CLOUD_TOKEN'],  // Never Expires
 }
+
 // Mapquest
 var mapquest = {
     key: process.env['MAPUEST_KEY'], // Never Expires
@@ -317,13 +328,24 @@ function authenticate() {
 
         my_obj = JSON.parse(my_obj); 
         
-        if (1) {
+        if (program.debug) {
             console.log("access_token: " + my_obj.access_token);
             console.log("token_type: " + my_obj.token_type);
             console.log("expires_in: " + my_obj.expires_in);
             console.log("refresh_token: " + my_obj.expires_in);
             console.log("created_at: " + my_obj.created_at);
         }
+
+        config = ini.parse(fs.readFileSync('./config.ini', 'utf-8'));
+
+        console.log("Old access token: " + config.TESLA_ACCESS_TOKEN);
+
+        const iniText = ini.stringify({TESLA_ACCESS_TOKEN_TEST: my_obj.access_token});
+        fs.writeFileSync('./config.ini', iniText)
+
+        config = ini.parse(fs.readFileSync('./config.ini', 'utf-8'));
+        console.log('New access token: ' + config.TESLA_ACCESS_TOKEN);
+
         return my_obj.access_token;
     };
 
@@ -510,7 +532,6 @@ function get_state() {
                         reverse_geocode(carLatitude, carLongitude);
                     }
 
-
                     pushLocation(signal.native_latitude, signal.native_longitude, carLatitude, carLongitude);
 
                     pushValue(signal.status, 'Awake :grinning:', teslaTimestamp);
@@ -533,8 +554,13 @@ function get_state() {
                     //     })
                 }
             } else {
-                console.log("Reauthenticate!");
-                process.exit(0);
+                console.log("Your API access token has expired, please reauthenticate.");
+                const input = prompt('Would you like to authenticate now? Type Y or N\n')
+                console.log(`You chose ${input}!`);
+                if (input == 'Y'){
+                    console.log("Reauthenticating...");
+                    authenticate();
+                }
             }
         } else {
             console.log('Servers are having problems...will resume when car wakes up.')
@@ -1213,9 +1239,6 @@ function get_option_codes() {
 
 function reverse_geocode(latpar, lonpar) {
 
-    latpar = 41.496211
-    lonpar = -81.6874176
-
     if ((latpar == undefined) && (lonpar == undefined)) { // If the location of car isnt specified, use default home coordinates
         // latpar = home.lat;
         // lonpar = home.lon;
@@ -1280,19 +1303,6 @@ function reverse_geocode(latpar, lonpar) {
 }
 
 function main() {
-
-    console.log(''.padStart(60, ' '));
-    console.log(''.padStart(60, ' '));
-    console.log(''.padStart(60, ' '));
-    console.log(''.padStart(60, ' '));
-    console.log(''.padStart(60, ' '));
-    console.log(''.padStart(60, ' '));
-    console.log(''.padStart(60, ' '));
-    console.log(''.padStart(60, ' '));
-    console.log(''.padStart(60, ' '));
-    console.log(''.padStart(60, ' '));
-    console.log(''.padStart(60, ' '));
-    console.log(''.padStart(60, ' '));
 
     console.log(''.padStart(60, '-'));
     console.log('          Tesla Dashboard - Powered By Initial State');
@@ -1371,6 +1381,17 @@ function main() {
                 break;
             case '10':
                 reverse_geocode();
+                break;
+            case '11':
+
+                config = ini.parse(fs.readFileSync('./config.ini', 'utf-8'));
+                console.log(config.TESLA_ACCESS_TOKEN_TEST);
+
+                const iniText = ini.stringify({TESLA_ACCESS_TOKEN_TEST: '5'});
+                fs.writeFileSync('./config.ini', iniText)
+
+                config = ini.parse(fs.readFileSync('./config.ini', 'utf-8'));
+                console.log(config.TESLA_ACCESS_TOKEN_TEST);
                 break;
         }
         readline.close();
